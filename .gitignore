@@ -1,4 +1,28 @@
+# Environment / secrets
+.env
+
+# Python
 venv/
 __pycache__/
-.env
 *.pyc
+*.pyo
+
+# Database / user data
+nexusai_memory.db
+*.db
+*.backup.db
+backups/
+
+# Logs
+logs/
+*.log
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.bak

@@ -1,0 +1,144 @@
+services:
+
+  # =================================
+  # OLLAMA
+  # =================================
+
+  ollama:
+
+  image: ollama/ollama:latest
+
+  container_name: nexusai-ollama
+
+  restart: unless-stopped
+
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+    volumes:
+      - ollama_data:/root/.ollama
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "ollama list >/dev/null 2>&1 || exit 1"
+        ]
+
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+
+
+  # =================================
+  # MODEL INITIALIZER
+  # =================================
+
+  ollama-init:
+    image: ollama/ollama:latest
+
+    container_name: nexusai-ollama-init
+
+    depends_on:
+      ollama:
+        condition: service_healthy
+
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+
+    entrypoint:
+      - /bin/sh
+      - -c
+
+    command:
+      - ollama pull ${OLLAMA_MODEL:-llama3.2:3b}
+
+    restart: "no"
+
+
+  # =================================
+  # NEXUSAI
+  # =================================
+
+  nexusai:
+    build:
+    context: .
+    dockerfile: Dockerfile
+
+  container_name: nexusai-app
+
+  restart: unless-stopped
+
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+  security_opt:
+  - no-new-privileges:true
+
+  init: true
+
+  depends_on:
+
+      ollama:
+        condition: service_healthy
+
+      ollama-init:
+        condition: service_completed_successfully
+
+    env_file:
+      - .env
+
+    environment:
+
+      APP_HOST: 0.0.0.0
+      APP_PORT: 8000
+
+      DATABASE_PATH: /data/nexusai_memory.db
+
+      # Docker containers communicate
+      # through service names.
+      OLLAMA_URL: http://ollama:11434/api/chat
+
+      OLLAMA_HEALTH_URL: http://ollama:11434/api/tags
+
+    ports:
+        - "127.0.0.1:8000:8000"
+
+    volumes:
+      - ./logs:/app/logs
+      - nexusai_data:/data
+
+    healthcheck:
+
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"
+        ]
+
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+    stop_grace_period: 20s
+
+
+# ===================================
+# PERSISTENT OLLAMA MODEL STORAGE
+# ===================================
+
+volumes:
+
+  ollama_data:
+  nexusai_data:
+
+  
